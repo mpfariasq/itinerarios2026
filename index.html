@@ -1,0 +1,1015 @@
+          <!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Itinerarios - Colegio San José</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- jsPDF para la generación de PDFs directos -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- JSZip para empaquetar los PDFs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- SheetJS para procesar archivos Excel (.xlsx y .xls) directamente -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Estilos para simular la hoja de PDF del Colegio */
+        .pdf-preview-sheet {
+            width: 210mm;
+            min-height: 297mm;
+            padding: 20mm;
+            background: white;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            color: #1a1a1a;
+            font-size: 11pt;
+            line-height: 1.5;
+            position: relative;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800">
+
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Encabezado Principal -->
+        <header class="flex flex-col md:flex-row items-center justify-between border-b border-slate-300 pb-6 mb-8 gap-4">
+            <div class="flex items-center gap-4">
+                <div class="bg-blue-900 text-white p-3 rounded-xl shadow-md">
+                    <i data-lucide="graduation-cap" class="w-8 h-8"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl md:text-3xl font-bold text-slate-900">Colegio San José</h1>
+                    <p class="text-sm text-slate-500 font-medium">Generador de Itinerarios de Aprendizajes — Ciclo Lectivo 2026</p>
+                </div>
+            </div>
+            <div class="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2 text-emerald-800 text-sm font-medium flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Soporte Excel Activo
+            </div>
+        </header>
+
+        <!-- Banner de Notificación de Alertas Interno (Reemplaza a los molestos alert nativos) -->
+        <div id="ui-alert" class="hidden max-w-full mb-6 p-4 rounded-xl border flex items-center justify-between transition-all duration-300">
+            <div class="flex items-center gap-3">
+                <div id="ui-alert-icon-container" class="p-1.5 rounded-lg">
+                    <i id="ui-alert-icon" class="w-5 h-5"></i>
+                </div>
+                <p id="ui-alert-message" class="text-sm font-medium"></p>
+            </div>
+            <button onclick="dismissAlert()" class="text-slate-400 hover:text-slate-600">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- Columna Izquierda: Panel de Control y Carga -->
+            <div class="lg:col-span-5 space-y-6">
+
+                <!-- Sección: Subir Logo Oficial de la Institución -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+                    <div class="flex items-center gap-2 pb-3 border-b border-slate-100">
+                        <i data-lucide="image" class="text-blue-600 w-5 h-5"></i>
+                        <h2 class="text-lg font-semibold text-slate-900">Logo de la Institución</h2>
+                    </div>
+                    <p class="text-xs text-slate-500">Sube la imagen del escudo del colegio (PNG o JPG). El sistema recordará esta imagen automáticamente en este navegador.</p>
+                    
+                    <div class="flex items-center gap-4">
+                        <div class="relative w-24 h-24 bg-slate-50 rounded-xl border border-dashed border-slate-300 flex items-center justify-center overflow-hidden group">
+                            <img id="logo-thumbnail" class="w-full h-full object-contain hidden" alt="Vista previa logo" />
+                            <div id="logo-placeholder-icon" class="text-slate-400 text-center p-2">
+                                <i data-lucide="camera" class="w-6 h-6 mx-auto mb-1"></i>
+                                <span class="text-[9px] font-semibold uppercase">Sin Logo</span>
+                            </div>
+                        </div>
+                        <div class="flex-1 space-y-2">
+                            <label class="inline-flex items-center justify-center gap-2 w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs py-2.5 px-4 rounded-xl cursor-pointer transition border border-slate-200">
+                                <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+                                Seleccionar Imagen
+                                <input type="file" id="file-logo" accept="image/*" class="hidden" onchange="handleLogoUpload(event)">
+                            </label>
+                            <button id="btn-remove-logo" onclick="removeStoredLogo()" class="hidden w-full text-center text-xs text-rose-600 hover:text-rose-800 font-medium py-1">
+                                Eliminar logo guardado
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Sección de Carga de Archivos Excel -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+                    <div class="flex items-center gap-2 pb-3 border-b border-slate-100">
+                        <i data-lucide="file-spreadsheet" class="text-blue-600 w-5 h-5"></i>
+                        <h2 class="text-lg font-semibold text-slate-900">Subir Planillas Excel</h2>
+                    </div>
+                    <p class="text-xs text-slate-500">Sube los archivos correspondientes a cada espacio curricular para consolidar la información académica de los alumnos.</p>
+                    
+                    <div class="grid grid-cols-1 gap-4 pt-2">
+                        <!-- Espacio 1: Inglés -->
+                        <div class="space-y-1">
+                            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider">1. Inglés</label>
+                            <div class="relative flex items-center justify-between border border-dashed border-slate-300 rounded-lg p-3 hover:bg-slate-50 transition cursor-pointer group">
+                                <input type="file" id="file-ingles" accept=".xlsx, .xls" class="absolute inset-0 opacity-0 cursor-pointer" onchange="handleExcelUpload(event, 'ingles')">
+                                <div class="flex items-center gap-3">
+                                    <i data-lucide="file-spreadsheet" id="icon-ingles" class="w-5 h-5 text-slate-400 group-hover:text-blue-500"></i>
+                                    <span id="name-ingles" class="text-xs font-medium text-slate-600 truncate max-w-[200px]">Seleccionar Excel de Inglés...</span>
+                                </div>
+                                <span id="badge-ingles" class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">FALTA</span>
+                            </div>
+                        </div>
+
+                        <!-- Espacio 2: Educación Religiosa -->
+                        <div class="space-y-1">
+                            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider">2. Educación Religiosa</label>
+                            <div class="relative flex items-center justify-between border border-dashed border-slate-300 rounded-lg p-3 hover:bg-slate-50 transition cursor-pointer group">
+                                <input type="file" id="file-religion" accept=".xlsx, .xls" class="absolute inset-0 opacity-0 cursor-pointer" onchange="handleExcelUpload(event, 'religion')">
+                                <div class="flex items-center gap-3">
+                                    <i data-lucide="file-spreadsheet" id="icon-religion" class="w-5 h-5 text-slate-400 group-hover:text-blue-500"></i>
+                                    <span id="name-religion" class="text-xs font-medium text-slate-600 truncate max-w-[200px]">Seleccionar Excel de Religión...</span>
+                                </div>
+                                <span id="badge-religion" class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">FALTA</span>
+                            </div>
+                        </div>
+
+                        <!-- Espacio 3: Robótica y Programación -->
+                        <div class="space-y-1">
+                            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider">3. Robótica y Programación</label>
+                            <div class="relative flex items-center justify-between border border-dashed border-slate-300 rounded-lg p-3 hover:bg-slate-50 transition cursor-pointer group">
+                                <input type="file" id="file-robotica" accept=".xlsx, .xls" class="absolute inset-0 opacity-0 cursor-pointer" onchange="handleExcelUpload(event, 'robotica')">
+                                <div class="flex items-center gap-3">
+                                    <i data-lucide="file-spreadsheet" id="icon-robotica" class="w-5 h-5 text-slate-400 group-hover:text-blue-500"></i>
+                                    <span id="name-robotica" class="text-xs font-medium text-slate-600 truncate max-w-[200px]">Seleccionar Excel de Robótica...</span>
+                                </div>
+                                <span id="badge-robotica" class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">FALTA</span>
+                            </div>
+                        </div>
+
+                        <!-- Espacio 4: Informática -->
+                        <div class="space-y-1">
+                            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider">4. Informática (Opcional)</label>
+                            <div class="relative flex items-center justify-between border border-dashed border-slate-300 rounded-lg p-3 hover:bg-slate-50 transition cursor-pointer group">
+                                <input type="file" id="file-informatica" accept=".xlsx, .xls" class="absolute inset-0 opacity-0 cursor-pointer" onchange="handleExcelUpload(event, 'informatica')">
+                                <div class="flex items-center gap-3">
+                                    <i data-lucide="file-spreadsheet" id="icon-informatica" class="w-5 h-5 text-slate-400 group-hover:text-blue-500"></i>
+                                    <span id="name-informatica" class="text-xs font-medium text-slate-600 truncate max-w-[200px]">Seleccionar Excel de Informática...</span>
+                                </div>
+                                <span id="badge-informatica" class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">FALTA</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Consolidación y Descarga -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="font-bold text-slate-900">Acciones de Generación</h3>
+                        <span id="total-students-count" class="bg-blue-50 text-blue-700 text-xs px-2.5 py-1 rounded-full font-semibold">0 alumnos cargados</span>
+                    </div>
+
+                    <button id="btn-generate-zip" onclick="generateAllPDFsZip()" disabled class="w-full bg-slate-200 text-slate-400 font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition cursor-not-allowed">
+                        <i data-lucide="archive"></i>
+                        Descargar Todos los PDFs (ZIP)
+                    </button>
+                    
+                    <button id="btn-clear" onclick="clearData()" class="w-full bg-rose-50 text-rose-600 hover:bg-rose-100 font-medium py-2 px-4 rounded-xl flex items-center justify-center gap-2 transition text-sm">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        Limpiar todos los datos
+                    </button>
+                </div>
+
+                <!-- Lista rápida de alumnos para previsualizar -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <h3 class="font-bold text-slate-900 mb-3 flex items-center gap-2">
+                        <i data-lucide="users" class="w-5 h-5 text-blue-600"></i>
+                        Listado de Alumnos
+                    </h3>
+                    <div class="relative mb-3">
+                        <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+                        <input type="text" id="search-student" placeholder="Buscar alumno por nombre..." oninput="filterStudents()" class="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div id="students-list-container" class="max-h-[300px] overflow-y-auto space-y-1 pr-1 text-sm text-slate-400 italic text-center py-4">
+                        Sube al menos un archivo para listar los estudiantes.
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Columna Derecha: Previsualización de PDF en Vivo -->
+            <div class="lg:col-span-7 flex flex-col items-center">
+                <div class="w-full bg-slate-800 text-white p-4 rounded-t-2xl shadow-sm flex items-center justify-between gap-4">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="eye" class="text-emerald-400"></i>
+                        <span class="text-sm font-semibold">Vista Previa Real del Itinerario</span>
+                    </div>
+                    <button id="btn-download-single" onclick="downloadSelectedPDF()" disabled class="bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold text-xs px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition">
+                        <i data-lucide="download" class="w-4 h-4"></i> Guardar este PDF
+                    </button>
+                </div>
+
+                <!-- Hoja de Simulación de PDF -->
+                <div class="w-full overflow-x-auto bg-slate-300 p-6 rounded-b-2xl border-x border-b border-slate-200 flex justify-center">
+                    <div id="pdf-view" class="pdf-preview-sheet shadow-2xl relative flex flex-col justify-between">
+                        
+                        <div>
+                            <!-- Encabezado con Logo Cargado por el Usuario -->
+                            <div class="flex items-center justify-between border-b border-slate-300 pb-4 mb-6 gap-4">
+                                <div class="flex items-center w-full max-w-[65%] min-h-[60px] relative">
+                                    <!-- Logotipo Cargado Dinámicamente -->
+                                    <img id="pdf-header-logo" class="max-h-20 w-auto object-contain hidden" alt="Logo de la Institución" />
+                                    <!-- Logo Placeholder de Texto si no han subido imagen -->
+                                    <div id="pdf-header-text-fallback" class="flex flex-col">
+                                        <h2 class="text-lg font-bold tracking-tight text-blue-900 leading-none">COLEGIO SAN JOSÉ</h2>
+                                        <p class="text-xs text-slate-500 italic mt-1">Educación en valores</p>
+                                    </div>
+                                </div>
+                                <div class="text-right flex flex-col justify-center shrink-0">
+                                    <p class="text-[8pt] text-slate-500 uppercase tracking-widest font-medium">Independencia 302 - Córdoba</p>
+                                    <p class="text-[8pt] text-slate-500 uppercase tracking-widest font-medium">Tel: 0351-4223428</p>
+                                    <p class="text-[8pt] text-slate-600 font-bold uppercase tracking-wider mt-1">Ciclo Lectivo 2026</p>
+                                </div>
+                            </div>
+                            
+                            <h3 class="text-center text-sm font-bold text-slate-800 tracking-wider mb-6">ITINERARIO DE APRENDIZAJE 2026</h3>
+
+                            <!-- Info Alumno (Sin Docente) -->
+                            <div class="bg-slate-50 rounded-lg p-4 border border-slate-200 mb-6 flex justify-between items-center">
+                                <div>
+                                    <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Estudiante</span>
+                                    <span id="preview-student-name" class="text-lg font-bold text-blue-900">—</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Grado / Curso</span>
+                                    <span id="preview-student-grade" class="text-base font-bold text-slate-800">—</span>
+                                </div>
+                            </div>
+
+                            <!-- Espacios Curriculares -->
+                            <div id="preview-subjects-container" class="space-y-4">
+                                <!-- Espacio Vacío por Defecto -->
+                                <div class="text-center py-20 text-slate-400">
+                                    <i data-lucide="file-question" class="w-12 h-12 mx-auto stroke-1 mb-2"></i>
+                                    <p class="text-sm">Sube las planillas Excel de las materias para ver la unificación en tiempo real.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pie de página -->
+                        <div class="mt-8 border-t border-slate-200 pt-4 flex justify-between text-[8pt] text-slate-400">
+                            <span>Colegio San José — Itinerarios de Aprendizajes</span>
+                            <span>Córdoba, Argentina</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Script del aplicativo -->
+    <script>
+        // Inicializar iconos de Lucide
+        lucide.createIcons();
+
+        // Base de Datos consolidada en memoria
+        let database = {};
+        let selectedStudentKey = null;
+        
+        // Logo guardado en Base64
+        let institutionLogoBase64 = "";
+        let logoWidthPx = 0;
+        let logoHeightPx = 0;
+
+        // Materias configuradas
+        const SUBJECTS_CONFIG = {
+            ingles: { label: "Inglés" },
+            religion: { label: "Educación Religiosa" },
+            robotica: { label: "Robótica y Programación" },
+            informatica: { label: "Informática" }
+        };
+
+        // Alerta personalizada para la UI (reemplaza alert)
+        function showAlert(message, type = "success") {
+            const alertContainer = document.getElementById("ui-alert");
+            const alertIconContainer = document.getElementById("ui-alert-icon-container");
+            const alertIcon = document.getElementById("ui-alert-icon");
+            const alertMessage = document.getElementById("ui-alert-message");
+
+            alertMessage.innerText = message;
+            alertContainer.classList.remove("hidden");
+
+            if (type === "success") {
+                alertContainer.className = "max-w-full mb-6 p-4 rounded-xl border flex items-center justify-between transition-all duration-300 bg-emerald-50 border-emerald-200 text-emerald-800";
+                alertIconContainer.className = "p-1.5 rounded-lg bg-emerald-100 text-emerald-600";
+                alertIcon.setAttribute("data-lucide", "check-circle-2");
+            } else if (type === "error") {
+                alertContainer.className = "max-w-full mb-6 p-4 rounded-xl border flex items-center justify-between transition-all duration-300 bg-rose-50 border-rose-200 text-rose-800";
+                alertIconContainer.className = "p-1.5 rounded-lg bg-rose-100 text-rose-600";
+                alertIcon.setAttribute("data-lucide", "alert-triangle");
+            } else {
+                alertContainer.className = "max-w-full mb-6 p-4 rounded-xl border flex items-center justify-between transition-all duration-300 bg-amber-50 border-amber-200 text-amber-800";
+                alertIconContainer.className = "p-1.5 rounded-lg bg-amber-100 text-amber-600";
+                alertIcon.setAttribute("data-lucide", "info");
+            }
+
+            lucide.createIcons();
+            
+            // Auto-ocultar después de 5 segundos
+            setTimeout(() => {
+                dismissAlert();
+            }, 6000);
+        }
+
+        function dismissAlert() {
+            document.getElementById("ui-alert").classList.add("hidden");
+        }
+
+        // Cargar el Logo desde LocalStorage si existe
+        window.addEventListener('load', () => {
+            const savedLogo = localStorage.getItem('colegio_san_jose_logo');
+            if (savedLogo) {
+                institutionLogoBase64 = savedLogo;
+                
+                // Medir dimensiones del logo almacenado
+                const tempImg = new Image();
+                tempImg.onload = function() {
+                    logoWidthPx = tempImg.width;
+                    logoHeightPx = tempImg.height;
+                    updateLogoUIVisibility();
+                };
+                tempImg.src = savedLogo;
+            }
+        });
+
+        // Gestionar la subida del Logo por el usuario
+        function handleLogoUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const base64String = e.target.result;
+                
+                // Medir dimensiones reales de la imagen para respetar su proporción
+                const tempImg = new Image();
+                tempImg.onload = function() {
+                    logoWidthPx = tempImg.width;
+                    logoHeightPx = tempImg.height;
+                    institutionLogoBase64 = base64String;
+                    
+                    // Almacenar en localStorage para futuras sesiones
+                    localStorage.setItem('colegio_san_jose_logo', base64String);
+                    updateLogoUIVisibility();
+                    
+                    showAlert("Logo institucional cargado y guardado correctamente.", "success");
+                };
+                tempImg.src = base64String;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Actualizar visualizaciones del logo en pantalla
+        function updateLogoUIVisibility() {
+            const thumbnail = document.getElementById('logo-thumbnail');
+            const placeholderIcon = document.getElementById('logo-placeholder-icon');
+            const previewLogoImg = document.getElementById('pdf-header-logo');
+            const previewTextFallback = document.getElementById('pdf-header-text-fallback');
+            const btnRemoveLogo = document.getElementById('btn-remove-logo');
+
+            if (institutionLogoBase64) {
+                // Actualizar miniatura en panel de carga
+                thumbnail.src = institutionLogoBase64;
+                thumbnail.classList.remove('hidden');
+                placeholderIcon.classList.add('hidden');
+                btnRemoveLogo.classList.remove('hidden');
+
+                // Actualizar logo en la vista previa del PDF
+                previewLogoImg.src = institutionLogoBase64;
+                previewLogoImg.classList.remove('hidden');
+                previewTextFallback.classList.add('hidden');
+            } else {
+                thumbnail.classList.add('hidden');
+                placeholderIcon.classList.remove('hidden');
+                btnRemoveLogo.classList.add('hidden');
+
+                previewLogoImg.classList.add('hidden');
+                previewTextFallback.classList.remove('hidden');
+            }
+        }
+
+        // Eliminar Logo Guardado
+        function removeStoredLogo() {
+            localStorage.removeItem('colegio_san_jose_logo');
+            institutionLogoBase64 = "";
+            logoWidthPx = 0;
+            logoHeightPx = 0;
+            updateLogoUIVisibility();
+            showAlert("Logo eliminado del almacenamiento.", "info");
+        }
+
+        // Procesar la carga de un archivo Excel (.xlsx / .xls)
+        function handleExcelUpload(event, subjectKey) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const nameSpan = document.getElementById(`name-${subjectKey}`);
+            const badgeSpan = document.getElementById(`badge-${subjectKey}`);
+            const icon = document.getElementById(`icon-${subjectKey}`);
+
+            nameSpan.innerText = file.name;
+            nameSpan.classList.remove('text-slate-600');
+            nameSpan.classList.add('text-blue-600', 'font-semibold');
+            
+            badgeSpan.innerText = "CARGANDO...";
+            badgeSpan.classList.remove('bg-slate-100', 'text-slate-600');
+            badgeSpan.classList.add('bg-amber-100', 'text-amber-700');
+
+            icon.className = "w-5 h-5 text-amber-500 animate-spin";
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    // Tomamos la primera hoja del Excel
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    // Convertimos la hoja a una matriz bidimensional
+                    const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+                    
+                    processExcelData(rows, subjectKey);
+                    
+                    // Marcamos como exitoso
+                    badgeSpan.innerText = "CARGADO";
+                    badgeSpan.classList.remove('bg-amber-100', 'text-amber-700');
+                    badgeSpan.classList.add('bg-emerald-100', 'text-emerald-700');
+                    icon.className = "w-5 h-5 text-emerald-500";
+                    icon.classList.remove('animate-spin');
+
+                    showAlert(`Planilla de ${SUBJECTS_CONFIG[subjectKey].label} procesada con éxito.`, "success");
+
+                } catch (error) {
+                    showAlert("Error al abrir e interpretar el archivo Excel: " + error.message, "error");
+                    badgeSpan.innerText = "ERROR";
+                    badgeSpan.className = "text-[10px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-bold";
+                    icon.className = "w-5 h-5 text-rose-500";
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Procesar matriz bidimensional de datos extraída del Excel
+        function processExcelData(rows, subjectKey) {
+            let dataRowStartIndex = -1;
+            let cursoDetectado = "Grado No Especificado"; 
+            let materiaDetectada = SUBJECTS_CONFIG[subjectKey].label;
+
+            // Escaneamos las primeras filas para buscar el Curso, Materia y la fila cabecera real
+            for (let i = 0; i < rows.length; i++) {
+                const fila = rows[i].map(celda => celda !== null && celda !== undefined ? String(celda).trim() : "");
+                
+                // Detectar el curso desde el encabezado del San José
+                const cellCurso = fila.find(c => c.toLowerCase().includes("curso:"));
+                if (cellCurso) {
+                    const partes = cellCurso.split(/curso:/i);
+                    if (partes[1]) cursoDetectado = partes[1].trim();
+                }
+
+                // Detectar cabecera real de alumnos
+                if (fila.some(c => c.toLowerCase().includes("nº orden") || c.toLowerCase().includes("orden")) && 
+                    fila.some(c => c.toLowerCase().includes("matrícula") || c.toLowerCase().includes("matricula")) && 
+                    fila.some(c => c.toLowerCase().includes("apellido y nombre") || c.toLowerCase().includes("apellido"))) {
+                    dataRowStartIndex = i + 1; // Datos de estudiantes arrancan justo después
+                }
+            }
+
+            // Fallback en caso de que no se encuentre la cabecera exacta
+            if (dataRowStartIndex === -1) {
+                dataRowStartIndex = 14; 
+            }
+
+            // Recorrer los registros de los alumnos
+            for (let i = dataRowStartIndex; i < rows.length; i++) {
+                const fila = rows[i];
+                if (!fila || fila.length < 3) continue;
+
+                const nOrden = fila[0] !== undefined ? String(fila[0]).trim() : "";
+                const matricula = fila[1] !== undefined ? String(fila[1]).trim() : "";
+                const nombreCompleto = fila[2] !== undefined ? String(fila[2]).trim() : "";
+                const observacionCruda = fila[3] !== undefined ? String(fila[3]).trim() : "";
+
+                // Validación de fin de planilla o filas vacías
+                if (!nombreCompleto || isNaN(nOrden) || nombreCompleto.toUpperCase().includes("APELLIDO") || nOrden === "") {
+                    continue;
+                }
+
+                // Identificador único de consolidación
+                const studentKey = matricula || nombreCompleto;
+
+                if (!database[studentKey]) {
+                    database[studentKey] = {
+                        matricula: matricula,
+                        nombre: nombreCompleto,
+                        grado: cursoDetectado,
+                        materias: {}
+                    };
+                }
+
+                // Extraemos la valoración con el texto completo (mantiene la firma si la hay)
+                const infoExtraida = parseTextoObservacion(observacionCruda, materiaDetectada);
+
+                database[studentKey].materias[subjectKey] = {
+                    materiaOriginal: materiaDetectada,
+                    observacion: infoExtraida.observacion,
+                    calificacion: infoExtraida.calificacion
+                };
+            }
+
+            // Actualizar la vista e interfaz de usuario
+            updateStudentsList();
+            enableGenerateButtons();
+        }
+
+        // Parsea el texto manteniendo completo el docente y su firma
+        function parseTextoObservacion(text, materia) {
+            if (!text) {
+                return { observacion: "Sin observaciones cargadas para esta etapa.", calificacion: "—" };
+            }
+
+            let observacion = text;
+            let calificacion = "MB"; // Valor predeterminado
+
+            // Buscar Calificación (Formatos habituales en planillas)
+            const califRegex = /Calificaci[oó]n:\s*([A-Za-z]+)/i;
+            const califMatch = text.match(califRegex);
+            if (califMatch) {
+                calificacion = califMatch[1].trim();
+                observacion = observacion.replace(califMatch[0], "");
+            }
+
+            // Se mantiene el texto COMPLETO tal como viene en el excel sin filtrar firmas de profesores/docentes
+            observacion = observacion.trim();
+
+            // Limpieza general de caracteres sobrantes al final
+            observacion = observacion.replace(/^["'\s]+|["'\s]+$/g, ""); // Quitar comillas externas
+            observacion = observacion.replace(/[,\s.\n\r]+$/, "").trim();
+            if (observacion.length > 0 && !observacion.endsWith(".")) {
+                observacion += ".";
+            }
+
+            return {
+                observacion: observacion,
+                calificacion: calificacion
+            };
+        }
+
+        // Restablecer todas las planillas cargadas
+        function clearData() {
+            database = {};
+            selectedStudentKey = null;
+            
+            ["ingles", "religion", "robotica", "informatica"].forEach(key => {
+                document.getElementById(`file-${key}`).value = "";
+                
+                const nameSpan = document.getElementById(`name-${key}`);
+                nameSpan.innerText = "Seleccionar planilla...";
+                nameSpan.className = "text-xs font-medium text-slate-600 truncate max-w-[200px]";
+                
+                const badgeSpan = document.getElementById(`badge-${key}`);
+                badgeSpan.innerText = "FALTA";
+                badgeSpan.className = "text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold";
+                
+                const icon = document.getElementById(`icon-${key}`);
+                icon.className = "w-5 h-5 text-slate-400";
+            });
+
+            document.getElementById('preview-student-name').innerText = "—";
+            document.getElementById('preview-student-grade').innerText = "—";
+            document.getElementById('preview-subjects-container').innerHTML = `
+                <div class="text-center py-20 text-slate-400">
+                    <i data-lucide="file-question" class="w-12 h-12 mx-auto stroke-1 mb-2"></i>
+                    <p class="text-sm">Sube las planillas Excel de las materias para ver la unificación en tiempo real.</p>
+                </div>
+            `;
+            
+            const btnSingle = document.getElementById('btn-download-single');
+            btnSingle.disabled = true;
+            
+            const btnZip = document.getElementById('btn-generate-zip');
+            btnZip.disabled = true;
+            btnZip.className = "w-full bg-slate-200 text-slate-400 font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition cursor-not-allowed";
+
+            updateStudentsList();
+            lucide.createIcons();
+            showAlert("Se han restablecido todas las planillas correctamente.", "info");
+        }
+
+        // Actualizar listado lateral de alumnos
+        function updateStudentsList() {
+            const container = document.getElementById('students-list-container');
+            const totalBadge = document.getElementById('total-students-count');
+            
+            const keys = Object.keys(database).sort((a, b) => database[a].nombre.localeCompare(database[b].nombre));
+            
+            if (keys.length === 0) {
+                container.innerHTML = `Sube al menos un archivo para listar los estudiantes.`;
+                totalBadge.innerText = "0 alumnos cargados";
+                return;
+            }
+
+            totalBadge.innerText = `${keys.length} alumnos cargados`;
+            container.innerHTML = "";
+
+            keys.forEach(key => {
+                const s = database[key];
+                const countSubjects = Object.keys(s.materias).length;
+
+                const btn = document.createElement('button');
+                btn.type = "button";
+                btn.className = `w-full text-left px-3 py-2.5 rounded-xl transition text-xs flex items-center justify-between gap-2 border ${selectedStudentKey === key ? 'bg-blue-50 border-blue-200 text-blue-900 font-semibold' : 'bg-white hover:bg-slate-50 border-slate-100 text-slate-700'}`;
+                btn.onclick = () => selectStudent(key);
+                
+                btn.innerHTML = `
+                    <div class="truncate max-w-[80%]">
+                        <span class="block font-bold text-slate-800 truncate">${s.nombre}</span>
+                        <span class="text-[10px] text-slate-400 block">${s.grado}</span>
+                    </div>
+                    <span class="px-2 py-0.5 rounded-full text-[9px] font-bold ${countSubjects === 4 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+                        ${countSubjects}/4 mat.
+                    </span>
+                `;
+                container.appendChild(btn);
+            });
+
+            // Auto-seleccionar primer alumno al cargar información
+            if (!selectedStudentKey && keys.length > 0) {
+                selectStudent(keys[0]);
+            }
+        }
+
+        // Filtro del buscador lateral
+        function filterStudents() {
+            const query = document.getElementById('search-student').value.toLowerCase();
+            const container = document.getElementById('students-list-container');
+            const buttons = container.getElementsByTagName('button');
+
+            for (let btn of buttons) {
+                const name = btn.querySelector('span.block').innerText.toLowerCase();
+                if (name.includes(query)) {
+                    btn.classList.remove('hidden');
+                } else {
+                    btn.classList.add('hidden');
+                }
+            }
+        }
+
+        // Seleccionar Alumno para Vista Previa en Pantalla (sin comillas)
+        function selectStudent(key) {
+            selectedStudentKey = key;
+            const student = database[key];
+
+            document.getElementById('preview-student-name').innerText = student.nombre;
+            document.getElementById('preview-student-grade').innerText = student.grado;
+
+            const container = document.getElementById('preview-subjects-container');
+            container.innerHTML = "";
+
+            const subjectsKeys = Object.keys(SUBJECTS_CONFIG);
+            subjectsKeys.forEach((subjKey, idx) => {
+                const config = SUBJECTS_CONFIG[subjKey];
+                const data = student.materias[subjKey];
+
+                const block = document.createElement('div');
+                block.className = "space-y-3";
+
+                const contentDiv = document.createElement('div');
+                contentDiv.className = "border-l-4 border-blue-900 pl-4 py-1.5 space-y-1.5";
+
+                if (data) {
+                    contentDiv.innerHTML = `
+                        <div class="flex items-center justify-between">
+                            <h4 class="font-bold text-slate-900 text-sm tracking-wide">${data.materiaOriginal}</h4>
+                            <span class="text-xs bg-blue-100 text-blue-900 font-bold px-2.5 py-0.5 rounded-full border border-blue-200">
+                                Calificación: ${data.calificacion}
+                            </span>
+                        </div>
+                        <p class="text-[10pt] text-slate-700 leading-relaxed text-justify italic font-serif">${data.observacion}</p>
+                    `;
+                } else {
+                    contentDiv.className = "border-l-4 border-slate-200 pl-4 py-1 space-y-1 bg-slate-50 rounded-r-lg pr-4 border-dashed";
+                    contentDiv.innerHTML = `
+                        <div class="flex items-center justify-between text-slate-400">
+                            <h4 class="font-semibold text-xs tracking-wide uppercase">${config.label}</h4>
+                            <span class="text-[10px] bg-slate-100 px-2 py-0.5 rounded-full">Falta planilla de esta materia</span>
+                        </div>
+                    `;
+                }
+
+                block.appendChild(contentDiv);
+
+                // Agregar línea de división en pantalla si no es la última materia
+                if (idx < subjectsKeys.length - 1) {
+                    const hr = document.createElement('hr');
+                    hr.className = "border-slate-200 my-4";
+                    block.appendChild(hr);
+                }
+
+                container.appendChild(block);
+            });
+
+            // Habilitar descargas individuales
+            const btnSingle = document.getElementById('btn-download-single');
+            btnSingle.disabled = false;
+
+            updateActiveListHighlight();
+        }
+
+        // Resaltar alumno seleccionado en el menú lateral
+        function updateActiveListHighlight() {
+            const container = document.getElementById('students-list-container');
+            const buttons = container.getElementsByTagName('button');
+            for (let btn of buttons) {
+                const isSelected = btn.innerHTML.includes(database[selectedStudentKey]?.nombre);
+                if (isSelected) {
+                    btn.className = "w-full text-left px-3 py-2.5 rounded-xl transition text-xs flex items-center justify-between gap-2 border bg-blue-50 border-blue-200 text-blue-900 font-semibold";
+                } else {
+                    btn.className = `w-full text-left px-3 py-2.5 rounded-xl transition text-xs flex items-center justify-between gap-2 border bg-white hover:bg-slate-50 border-slate-100 text-slate-700`;
+                }
+            }
+        }
+
+        // Habilitar los botones de descarga de archivos consolidados
+        function enableGenerateButtons() {
+            const hasData = Object.keys(database).length > 0;
+            const btnZip = document.getElementById('btn-generate-zip');
+            
+            if (hasData) {
+                btnZip.disabled = false;
+                btnZip.classList.remove('bg-slate-200', 'text-slate-400', 'cursor-not-allowed');
+                btnZip.classList.add('bg-blue-950', 'text-white', 'hover:bg-blue-900', 'shadow-lg', 'cursor-pointer');
+            }
+        }
+
+        // Función inteligente para justificar texto en jsPDF evitando espaciados gigantescos
+        function drawJustifiedParagraph(doc, text, x, y, maxWidth, lineHeight) {
+            const lines = doc.splitTextToSize(text, maxWidth);
+            const spaceWidth = doc.getTextWidth(" ");
+            
+            lines.forEach((lineText, lineIdx) => {
+                const isLastLine = lineIdx === lines.length - 1;
+                const words = lineText.trim().split(/\s+/);
+                
+                if (isLastLine || words.length <= 1) {
+                    doc.text(lineText, x, y);
+                } else {
+                    const totalWordsWidth = words.reduce((acc, word) => acc + doc.getTextWidth(word), 0);
+                    const totalSpaceToDistribute = maxWidth - totalWordsWidth;
+                    const extraSpacePerGap = totalSpaceToDistribute / (words.length - 1);
+                    
+                    // Medimos el ancho normal que ocuparía la línea
+                    const normalLineWidth = totalWordsWidth + (words.length - 1) * spaceWidth;
+                    
+                    // Condición inteligente: si la línea es demasiado corta (menos del 75% del ancho disponible)
+                    // o el espacio extra por palabra supera 2.5 veces un espacio normal, no justificamos
+                    // para evitar espaciados gigantescos. En su lugar alineamos normalmente a la izquierda.
+                    if (extraSpacePerGap > spaceWidth * 2.5 || normalLineWidth < (maxWidth * 0.75)) {
+                        doc.text(lineText, x, y);
+                    } else {
+                        let currentX = x;
+                        words.forEach((word) => {
+                            doc.text(word, currentX, y);
+                            currentX += doc.getTextWidth(word) + extraSpacePerGap;
+                        });
+                    }
+                }
+                y += lineHeight;
+            });
+            
+            return lines.length * lineHeight;
+        }
+
+        // Generar archivo PDF oficial
+        function createPDFForStudent(student) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'letter'
+            });
+
+            const marginX = 20;
+            
+            // Si hay un logo de institución cargado por el usuario, calcular proporción e insertarlo de forma segura
+            if (institutionLogoBase64) {
+                let printWidth = 50; // mm de ancho reservado
+                let ratio = logoWidthPx / logoHeightPx;
+                let printHeight = printWidth / ratio;
+                
+                // Evitar que el logo sobrepase una altura saludable
+                if (printHeight > 18) {
+                    printHeight = 18;
+                    printWidth = printHeight * ratio;
+                }
+                
+                // Añadir imagen al PDF
+                doc.addImage(institutionLogoBase64, 'JPEG', marginX, 10, printWidth, printHeight);
+            } else {
+                // Fallback de texto estilizado si no hay logo subido
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(14);
+                doc.setTextColor(30, 27, 75); // Azul noche
+                doc.text("COLEGIO SAN JOSÉ", marginX, 18);
+                doc.setFont("helvetica", "italic");
+                doc.setFontSize(8.5);
+                doc.setTextColor(100, 116, 139);
+                doc.text("Educación en valores", marginX, 23);
+            }
+            
+            // Datos del colegio en el lateral derecho de la cabecera
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(8);
+            doc.setTextColor(100, 116, 139);
+            doc.text("Independencia 302 - Córdoba", 195, 15, { align: 'right' });
+            doc.text("Tel: 0351-4223428", 195, 19, { align: 'right' });
+            doc.text("Ciclo Lectivo 2026", 195, 23, { align: 'right' });
+
+            // Línea gris divisoria superior
+            doc.setDrawColor(203, 213, 225);
+            doc.setLineWidth(0.4);
+            doc.line(marginX, 30, 195, 30);
+
+            // Título de Reporte
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(11);
+            doc.setTextColor(15, 23, 42);
+            doc.text("ITINERARIO DE APRENDIZAJE", 105, 37, { align: 'center' });
+
+            // Tarjeta de Información del Alumno
+            let currentY = 42;
+            doc.setFillColor(248, 250, 252);
+            doc.setDrawColor(226, 232, 240);
+            doc.roundedRect(marginX, currentY, 175, 16, 2, 2, 'FD');
+
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(8);
+            doc.setTextColor(148, 163, 184);
+            doc.text("ESTUDIANTE", marginX + 5, currentY + 5);
+            doc.text("CURSO / GRADO", 190 - 5, currentY + 5, { align: 'right' });
+
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(11);
+            doc.setTextColor(30, 41, 59);
+            doc.text(student.nombre, marginX + 5, currentY + 11);
+            doc.text(student.grado, 190 - 5, currentY + 11, { align: 'right' });
+
+            currentY += 24; // Salto para la primera materia
+
+            const materiasKeys = Object.keys(SUBJECTS_CONFIG);
+            
+            materiasKeys.forEach((subjKey, idx) => {
+                const config = SUBJECTS_CONFIG[subjKey];
+                const mData = student.materias[subjKey];
+
+                if (mData) {
+                    // Nombre de la Materia
+                    doc.setFont("helvetica", "bold");
+                    doc.setFontSize(10);
+                    doc.setTextColor(15, 23, 42);
+                    doc.text(mData.materiaOriginal, marginX, currentY);
+
+                    // Calificación alineada a la derecha
+                    doc.setFont("helvetica", "bold");
+                    doc.setFontSize(9.5);
+                    doc.text(`Calificación: ${mData.calificacion}`, 195, currentY, { align: 'right' });
+
+                    currentY += 5;
+
+                    // Valoración justificada
+                    doc.setFont("helvetica", "italic");
+                    doc.setFontSize(9);
+                    doc.setTextColor(71, 85, 105);
+
+                    // Extraemos la observación completa (incluye firma/docente si están en la celda original)
+                    const obsText = mData.observacion;
+                    
+                    // Renderizar texto justificado inteligentemente y calcular altura dinámica
+                    const alturaConsumida = drawJustifiedParagraph(doc, obsText, marginX, currentY, 175, 4.5);
+                    
+                    currentY += alturaConsumida + 5;
+                } else {
+                    // Renglón de materia no cargada en gris sutil
+                    doc.setFont("helvetica", "bold");
+                    doc.setFontSize(9.5);
+                    doc.setTextColor(186, 195, 209);
+                    doc.text(config.label, marginX, currentY);
+                    
+                    doc.setFont("helvetica", "normal");
+                    doc.setFontSize(8.5);
+                    doc.text(`Planilla no cargada`, 195, currentY, { align: 'right' });
+                    
+                    currentY += 8;
+                }
+
+                // Dibujar línea de división sutil si no es el último espacio curricular
+                if (idx < materiasKeys.length - 1) {
+                    doc.setDrawColor(226, 232, 240);
+                    doc.setLineWidth(0.3);
+                    doc.line(marginX, currentY - 2.5, 195, currentY - 2.5);
+                    currentY += 4;
+                }
+            });
+
+            // Pie de página institucional inamovible
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(8);
+            doc.setTextColor(148, 163, 184);
+            doc.text("Colegio San José — Itinerarios de Aprendizajes", marginX, 264);
+            doc.text("Córdoba, Argentina", 195, 264, { align: 'right' });
+
+            return doc;
+        }
+
+        // Descargar PDF del alumno seleccionado en pantalla
+        function downloadSelectedPDF() {
+            if (!selectedStudentKey) return;
+            try {
+                const student = database[selectedStudentKey];
+                const doc = createPDFForStudent(student);
+                
+                const safeName = student.nombre.replace(/[^a-zA-Z ]/g, "").replace(/\s+/g, "_");
+                doc.save(`${safeName}_Itinerario_2026.pdf`);
+                showAlert(`PDF de ${student.nombre} descargado correctamente.`, "success");
+            } catch (err) {
+                console.error(err);
+                showAlert("Ocurrió un error al generar este archivo PDF individual.", "error");
+            }
+        }
+
+        // Descarga unificada de todos los PDFs dentro de un ZIP con nombre del grado y división
+        function generateAllPDFsZip() {
+            const keys = Object.keys(database);
+            if (keys.length === 0) return;
+
+            const btnZip = document.getElementById('btn-generate-zip');
+            btnZip.disabled = true;
+            btnZip.innerText = "Comprimiendo carpeta ZIP...";
+
+            try {
+                const zip = new JSZip();
+                
+                // Obtener grado/curso del primer alumno para asignar nombre representativo al ZIP
+                const primerEstudiante = database[keys[0]];
+                const gradoDetectado = primerEstudiante.grado || "Itinerarios";
+                
+                // Limpiar acentos, espacios y símbolos para generar un nombre de archivo seguro
+                const nombreSeguroGrado = gradoDetectado
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "") // Quitar acentos
+                    .replace(/[º°]/g, "")           // Quitar caracteres de ordinales
+                    .replace(/[^a-zA-Z0-9\s-]/g, "") // Dejar solo alfanuméricos, espacios y guiones
+                    .trim()
+                    .replace(/\s+/g, "_");          // Reemplazar espacios por guiones bajos
+
+                keys.forEach(key => {
+                    const student = database[key];
+                    const doc = createPDFForStudent(student);
+                    const pdfBlob = doc.output('blob');
+                    
+                    // Nombre de cada reporte individual sin caracteres extraños
+                    const safeName = student.nombre.replace(/[^a-zA-Z ]/g, "").replace(/\s+/g, "_");
+                    zip.file(`${safeName}_Itinerario.pdf`, pdfBlob);
+                });
+
+                zip.generateAsync({ type: "blob" }).then(function(content) {
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(content);
+                    link.download = `${nombreSeguroGrado}_Itinerarios.zip`; // Nombre dinámico de Grado y División
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    btnZip.disabled = false;
+                    btnZip.innerText = "Descargar Todos los PDFs (ZIP)";
+                    enableGenerateButtons();
+                    showAlert("Carpeta comprimida ZIP descargada con éxito.", "success");
+                }).catch(err => {
+                    console.error("Error al comprimir los PDFs:", err);
+                    showAlert("Ocurrió un error al generar el empaquetado ZIP.", "error");
+                    btnZip.disabled = false;
+                    btnZip.innerText = "Descargar Todos los PDFs (ZIP)";
+                });
+            } catch (err) {
+                console.error(err);
+                showAlert("Error crítico durante la compresión.", "error");
+                btnZip.disabled = false;
+                btnZip.innerText = "Descargar Todos los PDFs (ZIP)";
+            }
+        }
+    </script>
+</body>
+</html>
