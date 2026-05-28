@@ -1,4 +1,4 @@
-          <!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -49,11 +49,11 @@
             </div>
             <div class="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2 text-emerald-800 text-sm font-medium flex items-center gap-2">
                 <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                Soporte Excel Activo
+                Soporte Excel & Índice Activo
             </div>
         </header>
 
-        <!-- Banner de Notificación de Alertas Interno (Reemplaza a los molestos alert nativos) -->
+        <!-- Banner de Notificación de Alertas Interno -->
         <div id="ui-alert" class="hidden max-w-full mb-6 p-4 rounded-xl border flex items-center justify-between transition-all duration-300">
             <div class="flex items-center gap-3">
                 <div id="ui-alert-icon-container" class="p-1.5 rounded-lg">
@@ -233,16 +233,16 @@
                                 </div>
                             </div>
                             
-                            <h3 class="text-center text-sm font-bold text-slate-800 tracking-wider mb-6">ITINERARIO DE APRENDIZAJE 2026</h3>
+                            <h3 class="text-center text-sm font-bold text-slate-800 tracking-wider mb-6">ITINERARIO DE APRENDIZAJE</h3>
 
                             <!-- Info Alumno (Sin Docente) -->
                             <div class="bg-slate-50 rounded-lg p-4 border border-slate-200 mb-6 flex justify-between items-center">
                                 <div>
-                                    <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Estudiante</span>
+                                    <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider font-semibold">Estudiante</span>
                                     <span id="preview-student-name" class="text-lg font-bold text-blue-900">—</span>
                                 </div>
                                 <div class="text-right">
-                                    <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Grado / Curso</span>
+                                    <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider font-semibold">Grado / Curso</span>
                                     <span id="preview-student-grade" class="text-base font-bold text-slate-800">—</span>
                                 </div>
                             </div>
@@ -317,7 +317,7 @@
 
             lucide.createIcons();
             
-            // Auto-ocultar después de 5 segundos
+            // Auto-ocultar después de 6 segundos
             setTimeout(() => {
                 dismissAlert();
             }, 6000);
@@ -380,13 +380,11 @@
             const btnRemoveLogo = document.getElementById('btn-remove-logo');
 
             if (institutionLogoBase64) {
-                // Actualizar miniatura en panel de carga
                 thumbnail.src = institutionLogoBase64;
                 thumbnail.classList.remove('hidden');
                 placeholderIcon.classList.add('hidden');
                 btnRemoveLogo.classList.remove('hidden');
 
-                // Actualizar logo en la vista previa del PDF
                 previewLogoImg.src = institutionLogoBase64;
                 previewLogoImg.classList.remove('hidden');
                 previewTextFallback.classList.add('hidden');
@@ -435,16 +433,13 @@
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     
-                    // Tomamos la primera hoja del Excel
                     const firstSheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[firstSheetName];
                     
-                    // Convertimos la hoja a una matriz bidimensional
                     const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
                     
                     processExcelData(rows, subjectKey);
                     
-                    // Marcamos como exitoso
                     badgeSpan.innerText = "CARGADO";
                     badgeSpan.classList.remove('bg-amber-100', 'text-amber-700');
                     badgeSpan.classList.add('bg-emerald-100', 'text-emerald-700');
@@ -463,37 +458,31 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // Procesar matriz bidimensional de datos extraída del Excel
         function processExcelData(rows, subjectKey) {
             let dataRowStartIndex = -1;
             let cursoDetectado = "Grado No Especificado"; 
             let materiaDetectada = SUBJECTS_CONFIG[subjectKey].label;
 
-            // Escaneamos las primeras filas para buscar el Curso, Materia y la fila cabecera real
             for (let i = 0; i < rows.length; i++) {
                 const fila = rows[i].map(celda => celda !== null && celda !== undefined ? String(celda).trim() : "");
                 
-                // Detectar el curso desde el encabezado del San José
                 const cellCurso = fila.find(c => c.toLowerCase().includes("curso:"));
                 if (cellCurso) {
                     const partes = cellCurso.split(/curso:/i);
                     if (partes[1]) cursoDetectado = partes[1].trim();
                 }
 
-                // Detectar cabecera real de alumnos
                 if (fila.some(c => c.toLowerCase().includes("nº orden") || c.toLowerCase().includes("orden")) && 
                     fila.some(c => c.toLowerCase().includes("matrícula") || c.toLowerCase().includes("matricula")) && 
                     fila.some(c => c.toLowerCase().includes("apellido y nombre") || c.toLowerCase().includes("apellido"))) {
-                    dataRowStartIndex = i + 1; // Datos de estudiantes arrancan justo después
+                    dataRowStartIndex = i + 1;
                 }
             }
 
-            // Fallback en caso de que no se encuentre la cabecera exacta
             if (dataRowStartIndex === -1) {
                 dataRowStartIndex = 14; 
             }
 
-            // Recorrer los registros de los alumnos
             for (let i = dataRowStartIndex; i < rows.length; i++) {
                 const fila = rows[i];
                 if (!fila || fila.length < 3) continue;
@@ -503,12 +492,10 @@
                 const nombreCompleto = fila[2] !== undefined ? String(fila[2]).trim() : "";
                 const observacionCruda = fila[3] !== undefined ? String(fila[3]).trim() : "";
 
-                // Validación de fin de planilla o filas vacías
                 if (!nombreCompleto || isNaN(nOrden) || nombreCompleto.toUpperCase().includes("APELLIDO") || nOrden === "") {
                     continue;
                 }
 
-                // Identificador único de consolidación
                 const studentKey = matricula || nombreCompleto;
 
                 if (!database[studentKey]) {
@@ -520,7 +507,6 @@
                     };
                 }
 
-                // Extraemos la valoración con el texto completo (mantiene la firma si la hay)
                 const infoExtraida = parseTextoObservacion(observacionCruda, materiaDetectada);
 
                 database[studentKey].materias[subjectKey] = {
@@ -530,21 +516,18 @@
                 };
             }
 
-            // Actualizar la vista e interfaz de usuario
             updateStudentsList();
             enableGenerateButtons();
         }
 
-        // Parsea el texto manteniendo completo el docente y su firma
         function parseTextoObservacion(text, materia) {
             if (!text) {
                 return { observacion: "Sin observaciones cargadas para esta etapa.", calificacion: "—" };
             }
 
             let observacion = text;
-            let calificacion = "MB"; // Valor predeterminado
+            let calificacion = "MB"; 
 
-            // Buscar Calificación (Formatos habituales en planillas)
             const califRegex = /Calificaci[oó]n:\s*([A-Za-z]+)/i;
             const califMatch = text.match(califRegex);
             if (califMatch) {
@@ -552,11 +535,8 @@
                 observacion = observacion.replace(califMatch[0], "");
             }
 
-            // Se mantiene el texto COMPLETO tal como viene en el excel sin filtrar firmas de profesores/docentes
             observacion = observacion.trim();
-
-            // Limpieza general de caracteres sobrantes al final
-            observacion = observacion.replace(/^["'\s]+|["'\s]+$/g, ""); // Quitar comillas externas
+            observacion = observacion.replace(/^["'\s]+|["'\s]+$/g, ""); 
             observacion = observacion.replace(/[,\s.\n\r]+$/, "").trim();
             if (observacion.length > 0 && !observacion.endsWith(".")) {
                 observacion += ".";
@@ -568,7 +548,6 @@
             };
         }
 
-        // Restablecer todas las planillas cargadas
         function clearData() {
             database = {};
             selectedStudentKey = null;
@@ -609,7 +588,6 @@
             showAlert("Se han restablecido todas las planillas correctamente.", "info");
         }
 
-        // Actualizar listado lateral de alumnos
         function updateStudentsList() {
             const container = document.getElementById('students-list-container');
             const totalBadge = document.getElementById('total-students-count');
@@ -646,13 +624,11 @@
                 container.appendChild(btn);
             });
 
-            // Auto-seleccionar primer alumno al cargar información
             if (!selectedStudentKey && keys.length > 0) {
                 selectStudent(keys[0]);
             }
         }
 
-        // Filtro del buscador lateral
         function filterStudents() {
             const query = document.getElementById('search-student').value.toLowerCase();
             const container = document.getElementById('students-list-container');
@@ -668,7 +644,6 @@
             }
         }
 
-        // Seleccionar Alumno para Vista Previa en Pantalla (sin comillas)
         function selectStudent(key) {
             selectedStudentKey = key;
             const student = database[key];
@@ -712,7 +687,6 @@
 
                 block.appendChild(contentDiv);
 
-                // Agregar línea de división en pantalla si no es la última materia
                 if (idx < subjectsKeys.length - 1) {
                     const hr = document.createElement('hr');
                     hr.className = "border-slate-200 my-4";
@@ -722,14 +696,12 @@
                 container.appendChild(block);
             });
 
-            // Habilitar descargas individuales
             const btnSingle = document.getElementById('btn-download-single');
             btnSingle.disabled = false;
 
             updateActiveListHighlight();
         }
 
-        // Resaltar alumno seleccionado en el menú lateral
         function updateActiveListHighlight() {
             const container = document.getElementById('students-list-container');
             const buttons = container.getElementsByTagName('button');
@@ -743,7 +715,6 @@
             }
         }
 
-        // Habilitar los botones de descarga de archivos consolidados
         function enableGenerateButtons() {
             const hasData = Object.keys(database).length > 0;
             const btnZip = document.getElementById('btn-generate-zip');
@@ -755,7 +726,6 @@
             }
         }
 
-        // Función inteligente para justificar texto en jsPDF evitando espaciados gigantescos
         function drawJustifiedParagraph(doc, text, x, y, maxWidth, lineHeight) {
             const lines = doc.splitTextToSize(text, maxWidth);
             const spaceWidth = doc.getTextWidth(" ");
@@ -771,12 +741,8 @@
                     const totalSpaceToDistribute = maxWidth - totalWordsWidth;
                     const extraSpacePerGap = totalSpaceToDistribute / (words.length - 1);
                     
-                    // Medimos el ancho normal que ocuparía la línea
                     const normalLineWidth = totalWordsWidth + (words.length - 1) * spaceWidth;
                     
-                    // Condición inteligente: si la línea es demasiado corta (menos del 75% del ancho disponible)
-                    // o el espacio extra por palabra supera 2.5 veces un espacio normal, no justificamos
-                    // para evitar espaciados gigantescos. En su lugar alineamos normalmente a la izquierda.
                     if (extraSpacePerGap > spaceWidth * 2.5 || normalLineWidth < (maxWidth * 0.75)) {
                         doc.text(lineText, x, y);
                     } else {
@@ -793,7 +759,6 @@
             return lines.length * lineHeight;
         }
 
-        // Generar archivo PDF oficial
         function createPDFForStudent(student) {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({
@@ -804,25 +769,21 @@
 
             const marginX = 20;
             
-            // Si hay un logo de institución cargado por el usuario, calcular proporción e insertarlo de forma segura
             if (institutionLogoBase64) {
-                let printWidth = 50; // mm de ancho reservado
+                let printWidth = 50; 
                 let ratio = logoWidthPx / logoHeightPx;
                 let printHeight = printWidth / ratio;
                 
-                // Evitar que el logo sobrepase una altura saludable
                 if (printHeight > 18) {
                     printHeight = 18;
                     printWidth = printHeight * ratio;
                 }
                 
-                // Añadir imagen al PDF
                 doc.addImage(institutionLogoBase64, 'JPEG', marginX, 10, printWidth, printHeight);
             } else {
-                // Fallback de texto estilizado si no hay logo subido
                 doc.setFont("helvetica", "bold");
                 doc.setFontSize(14);
-                doc.setTextColor(30, 27, 75); // Azul noche
+                doc.setTextColor(30, 27, 75); 
                 doc.text("COLEGIO SAN JOSÉ", marginX, 18);
                 doc.setFont("helvetica", "italic");
                 doc.setFontSize(8.5);
@@ -830,7 +791,6 @@
                 doc.text("Educación en valores", marginX, 23);
             }
             
-            // Datos del colegio en el lateral derecho de la cabecera
             doc.setFont("helvetica", "normal");
             doc.setFontSize(8);
             doc.setTextColor(100, 116, 139);
@@ -838,18 +798,15 @@
             doc.text("Tel: 0351-4223428", 195, 19, { align: 'right' });
             doc.text("Ciclo Lectivo 2026", 195, 23, { align: 'right' });
 
-            // Línea gris divisoria superior
             doc.setDrawColor(203, 213, 225);
             doc.setLineWidth(0.4);
             doc.line(marginX, 30, 195, 30);
 
-            // Título de Reporte
             doc.setFont("helvetica", "bold");
             doc.setFontSize(11);
             doc.setTextColor(15, 23, 42);
             doc.text("ITINERARIO DE APRENDIZAJE", 105, 37, { align: 'center' });
 
-            // Tarjeta de Información del Alumno
             let currentY = 42;
             doc.setFillColor(248, 250, 252);
             doc.setDrawColor(226, 232, 240);
@@ -867,7 +824,7 @@
             doc.text(student.nombre, marginX + 5, currentY + 11);
             doc.text(student.grado, 190 - 5, currentY + 11, { align: 'right' });
 
-            currentY += 24; // Salto para la primera materia
+            currentY += 24; 
 
             const materiasKeys = Object.keys(SUBJECTS_CONFIG);
             
@@ -876,33 +833,25 @@
                 const mData = student.materias[subjKey];
 
                 if (mData) {
-                    // Nombre de la Materia
                     doc.setFont("helvetica", "bold");
                     doc.setFontSize(10);
                     doc.setTextColor(15, 23, 42);
                     doc.text(mData.materiaOriginal, marginX, currentY);
 
-                    // Calificación alineada a la derecha
                     doc.setFont("helvetica", "bold");
                     doc.setFontSize(9.5);
                     doc.text(`Calificación: ${mData.calificacion}`, 195, currentY, { align: 'right' });
 
                     currentY += 5;
 
-                    // Valoración justificada
                     doc.setFont("helvetica", "italic");
                     doc.setFontSize(9);
                     doc.setTextColor(71, 85, 105);
 
-                    // Extraemos la observación completa (incluye firma/docente si están en la celda original)
                     const obsText = mData.observacion;
-                    
-                    // Renderizar texto justificado inteligentemente y calcular altura dinámica
                     const alturaConsumida = drawJustifiedParagraph(doc, obsText, marginX, currentY, 175, 4.5);
-                    
                     currentY += alturaConsumida + 5;
                 } else {
-                    // Renglón de materia no cargada en gris sutil
                     doc.setFont("helvetica", "bold");
                     doc.setFontSize(9.5);
                     doc.setTextColor(186, 195, 209);
@@ -915,7 +864,6 @@
                     currentY += 8;
                 }
 
-                // Dibujar línea de división sutil si no es el último espacio curricular
                 if (idx < materiasKeys.length - 1) {
                     doc.setDrawColor(226, 232, 240);
                     doc.setLineWidth(0.3);
@@ -924,7 +872,6 @@
                 }
             });
 
-            // Pie de página institucional inamovible
             doc.setFont("helvetica", "normal");
             doc.setFontSize(8);
             doc.setTextColor(148, 163, 184);
@@ -934,61 +881,87 @@
             return doc;
         }
 
-        // Descargar PDF del alumno seleccionado en pantalla
+        // Función de saneamiento de nombres para nombres de archivos seguros y limpios
+        function sanitizeNameForFilename(name) {
+            return name.normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "") // Eliminar acentos
+                .replace(/[^a-zA-Z0-9\s-_]/g, "") // Eliminar caracteres especiales excepto espacios y guiones
+                .trim()
+                .replace(/[\s,]+/g, "_") // Reemplazar comas o espacios con un guion bajo único
+                .toUpperCase();
+        }
+
         function downloadSelectedPDF() {
             if (!selectedStudentKey) return;
             try {
                 const student = database[selectedStudentKey];
                 const doc = createPDFForStudent(student);
                 
-                const safeName = student.nombre.replace(/[^a-zA-Z ]/g, "").replace(/\s+/g, "_");
-                doc.save(`${safeName}_Itinerario_2026.pdf`);
-                showAlert(`PDF de ${student.nombre} descargado correctamente.`, "success");
+                const cleanName = sanitizeNameForFilename(student.nombre);
+                const fileName = student.matricula 
+                    ? `${student.matricula}-${cleanName}.pdf` 
+                    : `${cleanName}.pdf`;
+
+                doc.save(fileName);
+                showAlert(`PDF de ${student.nombre} descargado exitosamente.`, "success");
             } catch (err) {
                 console.error(err);
-                showAlert("Ocurrió un error al generar este archivo PDF individual.", "error");
+                showAlert("Ocurrió un error al generar este archivo PDF.", "error");
             }
         }
 
-        // Descarga unificada de todos los PDFs dentro de un ZIP con nombre del grado y división
         function generateAllPDFsZip() {
             const keys = Object.keys(database);
             if (keys.length === 0) return;
 
             const btnZip = document.getElementById('btn-generate-zip');
             btnZip.disabled = true;
-            btnZip.innerText = "Comprimiendo carpeta ZIP...";
+            btnZip.innerText = "Comprimiendo carpeta y generando índice...";
 
             try {
                 const zip = new JSZip();
-                
-                // Obtener grado/curso del primer alumno para asignar nombre representativo al ZIP
+                const indexData = {}; // Índice JSON autogestionado
+
                 const primerEstudiante = database[keys[0]];
                 const gradoDetectado = primerEstudiante.grado || "Itinerarios";
                 
-                // Limpiar acentos, espacios y símbolos para generar un nombre de archivo seguro
                 const nombreSeguroGrado = gradoDetectado
                     .normalize("NFD")
-                    .replace(/[\u0300-\u036f]/g, "") // Quitar acentos
-                    .replace(/[º°]/g, "")           // Quitar caracteres de ordinales
-                    .replace(/[^a-zA-Z0-9\s-]/g, "") // Dejar solo alfanuméricos, espacios y guiones
+                    .replace(/[\u0300-\u036f]/g, "") 
+                    .replace(/[º°]/g, "")           
+                    .replace(/[^a-zA-Z0-9\s-]/g, "") 
                     .trim()
-                    .replace(/\s+/g, "_");          // Reemplazar espacios por guiones bajos
+                    .replace(/\s+/g, "_");          
 
                 keys.forEach(key => {
                     const student = database[key];
                     const doc = createPDFForStudent(student);
                     const pdfBlob = doc.output('blob');
                     
-                    // Nombre de cada reporte individual sin caracteres extraños
-                    const safeName = student.nombre.replace(/[^a-zA-Z ]/g, "").replace(/\s+/g, "_");
-                    zip.file(`${safeName}_Itinerario.pdf`, pdfBlob);
+                    const cleanName = sanitizeNameForFilename(student.nombre);
+                    const fileName = student.matricula 
+                        ? `${student.matricula}-${cleanName}.pdf` 
+                        : `${cleanName}.pdf`;
+
+                    zip.file(fileName, pdfBlob);
+
+                    // Alimentar el índice utilizando el número de matrícula
+                    if (student.matricula) {
+                        indexData[student.matricula] = {
+                            archivo: fileName,
+                            nombre: student.nombre,
+                            grado: student.grado
+                        };
+                    }
                 });
+
+                // Añadir el archivo 'itinerarios.json' al directorio raíz del ZIP generado
+                zip.file("itinerarios.json", JSON.stringify(indexData, null, 2));
 
                 zip.generateAsync({ type: "blob" }).then(function(content) {
                     const link = document.createElement('a');
                     link.href = URL.createObjectURL(content);
-                    link.download = `${nombreSeguroGrado}_Itinerarios.zip`; // Nombre dinámico de Grado y División
+                    link.download = `${nombreSeguroGrado}_Itinerarios.zip`; 
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
@@ -996,7 +969,7 @@
                     btnZip.disabled = false;
                     btnZip.innerText = "Descargar Todos los PDFs (ZIP)";
                     enableGenerateButtons();
-                    showAlert("Carpeta comprimida ZIP descargada con éxito.", "success");
+                    showAlert("Comprimido ZIP y archivo 'itinerarios.json' generados con éxito. Listo para subir al hosting.", "success");
                 }).catch(err => {
                     console.error("Error al comprimir los PDFs:", err);
                     showAlert("Ocurrió un error al generar el empaquetado ZIP.", "error");
